@@ -1,0 +1,8 @@
+
+\.vs/GrabDetectSort/v16/
+
+bin/Debug/
+
+*.cache
+
+obj/Debug/
