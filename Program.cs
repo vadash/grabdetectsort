@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -17,11 +18,13 @@ namespace GrabDetectSort
         public static string FfmpegExe = @"C:\portable\ffmpeg-4.1.1-win64-static\bin\ffmpeg.exe";
         public const int BlockSize = 416;
         public static string GameName = @"r5apex";
+        public static string DetectionThreshold = "0.15";
 
         #region Dont touch this
-        public static string DetectionThreshold = "0.15";
-        public static string SourceImagePath = DarknetPath + @"data\img\";
-        public static string TmpDirectory = DarknetPath + @"data\img2\";
+        public static string TempFolderAlias = "img2";     
+        public static float DontTouchAboveThisSize = 0.05f; // 1f = target takes 100% of image
+        public static float ImageSizeTolerance = 0.02f; // 1f = 100 % of image width/height
+        public static string TmpDirectory = DarknetPath + $@"data\{TempFolderAlias}\";
         public static string TrainTxtFile = DarknetPath + @"data\train.txt";
         public static string MainTxtFile = DarknetPath + $@"data\{GameName}.txt";
         public static string ResultFile = DarknetPath + @"result.txt";
@@ -43,7 +46,8 @@ namespace GrabDetectSort
                 ClearTmpDir();
                 FixFileNames();
                 GetFrames(TmpDirectory);
-                CreateImageList(TmpDirectory, "img2");
+                RemoveBadImages(TmpDirectory);
+                CreateImageList(TmpDirectory, TempFolderAlias);
                 LabelImages();
                 SortImages();
             }
@@ -51,8 +55,55 @@ namespace GrabDetectSort
             {
                 Console.WriteLine(e);
                 Console.ReadLine();
-                throw;
+                Console.ReadLine();
+                Console.ReadLine();
             }
+        }
+
+        // Optional and experimental
+        private static void RemoveBadImages(string tmpDirectory)
+        {
+            var listToDelete = new List<string>();
+            var files = Directory.GetFiles(tmpDirectory, "*.txt", SearchOption.AllDirectories);
+            foreach (var fullFileName in files)
+            {
+                using (var sw = new StreamReader(fullFileName, Encoding.Default))
+                {
+                    var line = sw.ReadLine();
+                    if (line == null) continue;
+                    line = line.Replace('.', ',');
+                    var values = line.Split();
+                    if (values.Length != 5) continue;
+                    if (!double.TryParse(values[1], out var cx) || !double.TryParse(values[2], out var cy) ||
+                        !double.TryParse(values[3], out var width) ||
+                        !double.TryParse(values[4], out var height)) continue;
+                    if (width * height < DontTouchAboveThisSize ||
+                        fullFileName.Contains("r5apexA1_") ||
+                        fullFileName.Contains("r5apexA2_") ||
+                        fullFileName.Contains("r5apexA3_") ||
+                        fullFileName.Contains("r5apexA4_"))
+                        if (cx - width / 2f < ImageSizeTolerance ||
+                            cx + width / 2f > 1f - ImageSizeTolerance ||
+                            cy - height / 2f < ImageSizeTolerance ||
+                            cx + height / 2f > 1f - ImageSizeTolerance)
+                        {
+                            listToDelete.Add(fullFileName);
+                        }
+                }
+            }
+
+            foreach (var fullFileName in listToDelete)
+            {
+                DeletePair(fullFileName);
+            }
+        }
+
+        private static void DeletePair(string fullFileName)
+        {
+            var dir = Path.GetDirectoryName(fullFileName);
+            var name = Path.GetFileNameWithoutExtension(fullFileName);
+            File.Delete(dir + @"\" + name + ".png");
+            File.Delete(dir + @"\" + name + ".txt");
         }
 
         private static void SortImages()
@@ -161,11 +212,13 @@ namespace GrabDetectSort
                 //...A1..A2...
                 //.....A0.....
                 //...A3..A4...
-                RunFfmpeg(file, "3", BlockSize, 752, 332, "A0", directory);
-                //RunFfmpeg(file, "2", BlockSize, 544, 124, "A1", TmpDirectory);
-                //RunFfmpeg(file, "2", BlockSize, 960, 124, "A2", TmpDirectory);
-                //RunFfmpeg(file, "2", BlockSize, 544, 540, "A3", TmpDirectory);
-                //RunFfmpeg(file, "2", BlockSize, 960, 540, "A4", TmpDirectory);
+                // 2 fps for main screen shot (middle of screen A0)
+                RunFfmpeg(file, "2", BlockSize, 752, 332, "A0", directory);
+                // and slightly less for secondary screens
+                RunFfmpeg(file, "1", BlockSize, 544, 124, "A1", TmpDirectory);
+                RunFfmpeg(file, "1", BlockSize, 960, 124, "A2", TmpDirectory);
+                RunFfmpeg(file, "1", BlockSize, 544, 540, "A3", TmpDirectory);
+                RunFfmpeg(file, "1", BlockSize, 960, 540, "A4", TmpDirectory);
             }
         }
 
@@ -203,12 +256,6 @@ namespace GrabDetectSort
 
         private static void VerifyUserPaths()
         {
-            if (!Directory.Exists(SourceImagePath))
-            {
-                Console.WriteLine("Main image directory " + SourceImagePath + " is empty");
-                Console.ReadKey();
-                Environment.Exit(1);
-            }
             if (!Directory.Exists(MoviePath))
             {
                 Console.WriteLine("Video directory " + MoviePath + " is empty");
