@@ -16,7 +16,8 @@ namespace GrabDetectSort
         // directory with darknet.exe
         public static string DarknetPath = @"C:\portable\darknet\";
         // default path for OBS and Shadowplay
-        public static string MoviePath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\..\..\Videos\";
+        //public static string MoviePath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\..\..\Videos\";
+        public static string MoviePath = @"E:\media\footage\";
         // get static build here https://ffmpeg.zeranoe.com/builds/
         public static string FfmpegExe = @"C:\portable\ffmpeg\bin\ffmpeg.exe";
         public static string GameName = @"r5apex";
@@ -24,14 +25,9 @@ namespace GrabDetectSort
 
         public static string PathToDetector = @"C:\portable\darknet\data\detectorNet\";
         public static string DetectorAlias = @"detectorNet";
-        //...A1..A2...
-        //.....A0.....
-        //...A3..A4...
-        // true will capture A0-A4 areas, false only A0
-        public static bool CaptureMore = false;
 
         #region Dont touch this
-        public const int BlockSize = 416; // how big region to get
+        public const int BlockSize = 608; // how big region to get
         public static string TempFolderAlias = "img2";     
         public static float DontTouchAboveThisSize = 0.05f; // 1f = target takes 100% of image
         public static float ImageSizeTolerance = 0.02f; // 1f = 100 % of image width/height
@@ -56,7 +52,7 @@ namespace GrabDetectSort
                 ClearTmpDir();
                 FixFileNames();
                 GetFrames(TmpDirectory);
-                RemoveBadImages(TmpDirectory);
+                //RemoveBadImages(TmpDirectory);
                 CreateImageList(TmpDirectory, TempFolderAlias);
                 LabelImages();
                 SortImages();
@@ -127,6 +123,13 @@ namespace GrabDetectSort
         {
             string line;
             var resultFile = new StreamReader(ResultFile);
+            #region Create directories
+            if (!Directory.Exists(OutPath)) Directory.CreateDirectory(OutPath);
+            //if (!Directory.Exists(OutPath + @"zero\")) Directory.CreateDirectory(OutPath + @"zero\");
+            if (!Directory.Exists(OutPath + @"low\")) Directory.CreateDirectory(OutPath + @"low\");
+            if (!Directory.Exists(OutPath + @"mid\")) Directory.CreateDirectory(OutPath + @"mid\");
+            if (!Directory.Exists(OutPath + @"high\")) Directory.CreateDirectory(OutPath + @"high\");
+            #endregion
             while ((line = resultFile.ReadLine()) != null)
             {
                 #region Extracting filename
@@ -152,40 +155,33 @@ namespace GrabDetectSort
                 else if (confidence >= 60 && confidence <= 100)
                     ConfidenceListHigh.Add(fileName.Value);
                 #endregion
-                #region Create directories
-                if (!Directory.Exists(OutPath)) Directory.CreateDirectory(OutPath);
-                //if (!Directory.Exists(OutPath + @"zero\")) Directory.CreateDirectory(OutPath + @"zero\");
-                if (!Directory.Exists(OutPath + @"low\")) Directory.CreateDirectory(OutPath + @"low\");
-                if (!Directory.Exists(OutPath + @"mid\")) Directory.CreateDirectory(OutPath + @"mid\");
-                if (!Directory.Exists(OutPath + @"high\")) Directory.CreateDirectory(OutPath + @"high\");
-                #endregion
-                #region Scan all files and sort them
-                var files = Directory.GetFiles(TmpDirectory, "*", SearchOption.AllDirectories);
-                foreach (var file in files)
-                {
-                    var name = Path.GetFileNameWithoutExtension(file);
-                    var ext = Path.GetExtension(file);
-                    string newFile = null;
-                    if (ConfidenceListHigh.Contains(name))
-                    {
-                        newFile = OutPath + @"high\" + name + ext;
-                    }
-                    else if (ConfidenceListMid.Contains(name))
-                    {
-                        newFile = OutPath + @"mid\" + name + ext;
-                    }
-                    else if (ConfidenceListLow.Contains(name))
-                    {
-                        newFile = OutPath + @"low\" + name + ext;
-
-                    }
-                    if (newFile != null)
-                    {
-                        File.Copy(file, newFile, true);
-                    }
-                }
-                #endregion
             }
+            #region Scan all files and sort them
+            var files = Directory.GetFiles(TmpDirectory, "*", SearchOption.AllDirectories);
+            foreach (var file in files)
+            {
+                var name = Path.GetFileNameWithoutExtension(file);
+                var ext = Path.GetExtension(file);
+                string newFile = null;
+                if (ConfidenceListHigh.Contains(name))
+                {
+                    newFile = OutPath + @"high\" + name + ext;
+                }
+                else if (ConfidenceListMid.Contains(name))
+                {
+                    newFile = OutPath + @"mid\" + name + ext;
+                }
+                else if (ConfidenceListLow.Contains(name))
+                {
+                    newFile = OutPath + @"low\" + name + ext;
+
+                }
+                if (newFile != null)
+                {
+                    File.Copy(file, newFile, true);
+                }
+            }
+            #endregion
         }
 
         private static void LabelImages()
@@ -229,15 +225,15 @@ namespace GrabDetectSort
                 //.....A0.....
                 //...A3..A4...
                 // 2 fps for main screen shot (middle of screen A0)
-                RunFfmpeg(file, "2", BlockSize, 752, 332, "A0", directory);
+                RunFfmpeg(file, "2", BlockSize, 1920 / 2 - BlockSize / 2, 1080 / 2 - BlockSize / 2, "A0", directory);
                 // and slightly less for secondary screens
-                if (CaptureMore)
-                {
-                    RunFfmpeg(file, "1", BlockSize, 544, 124, "A1", TmpDirectory);
-                    RunFfmpeg(file, "1", BlockSize, 960, 124, "A2", TmpDirectory);
-                    RunFfmpeg(file, "1", BlockSize, 544, 540, "A3", TmpDirectory);
-                    RunFfmpeg(file, "1", BlockSize, 960, 540, "A4", TmpDirectory);
-                }
+                //if (CaptureMore)
+                //{
+                //    RunFfmpeg(file, "1", BlockSize, 544, 124, "A1", TmpDirectory);
+                //    RunFfmpeg(file, "1", BlockSize, 960, 124, "A2", TmpDirectory);
+                //    RunFfmpeg(file, "1", BlockSize, 544, 540, "A3", TmpDirectory);
+                //    RunFfmpeg(file, "1", BlockSize, 960, 540, "A4", TmpDirectory);
+                //}
             }
         }
 
