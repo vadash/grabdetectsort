@@ -6,3 +6,5 @@ bin/Debug/
 *.cache
 
 obj/Debug/
+
+\.vs/GrabDetectSort/v15/

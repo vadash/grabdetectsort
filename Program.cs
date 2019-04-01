@@ -13,20 +13,30 @@ namespace GrabDetectSort
 {
     internal class Program
     {
-        public static string DarknetPath = @"C:\projects\FutureNNAimbot\FutureNNAimbot\bin\Release\darknet\";
-        public static string MoviePath = @"C:\Fraps\Movies\";
-        public static string FfmpegExe = @"C:\portable\ffmpeg-4.1.1-win64-static\bin\ffmpeg.exe";
-        public const int BlockSize = 416;
+        // directory with darknet.exe
+        public static string DarknetPath = @"C:\portable\darknet\";
+        // default path for OBS and Shadowplay
+        public static string MoviePath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\..\..\Videos\";
+        // get static build here https://ffmpeg.zeranoe.com/builds/
+        public static string FfmpegExe = @"C:\portable\ffmpeg\bin\ffmpeg.exe";
         public static string GameName = @"r5apex";
         public static string DetectionThreshold = "0.15";
 
+        public static string PathToDetector = @"C:\portable\darknet\data\detectorNet\";
+        public static string DetectorAlias = @"detectorNet";
+        //...A1..A2...
+        //.....A0.....
+        //...A3..A4...
+        // true will capture A0-A4 areas, false only A0
+        public static bool CaptureMore = false;
+
         #region Dont touch this
+        public const int BlockSize = 416; // how big region to get
         public static string TempFolderAlias = "img2";     
         public static float DontTouchAboveThisSize = 0.05f; // 1f = target takes 100% of image
         public static float ImageSizeTolerance = 0.02f; // 1f = 100 % of image width/height
         public static string TmpDirectory = DarknetPath + $@"data\{TempFolderAlias}\";
         public static string TrainTxtFile = DarknetPath + @"data\train.txt";
-        public static string MainTxtFile = DarknetPath + $@"data\{GameName}.txt";
         public static string ResultFile = DarknetPath + @"result.txt";
         public static string OutPath = DarknetPath + @"data\sorted\";
         public static List<string> ConfidenceListLow = new List<string>();
@@ -50,6 +60,7 @@ namespace GrabDetectSort
                 CreateImageList(TmpDirectory, TempFolderAlias);
                 LabelImages();
                 SortImages();
+                ClearShitAfter();
             }
             catch (Exception e)
             {
@@ -58,6 +69,12 @@ namespace GrabDetectSort
                 Console.ReadLine();
                 Console.ReadLine();
             }
+        }
+
+        private static void ClearShitAfter()
+        {
+            File.Delete(DarknetPath + @"predictions.jpg");
+            File.Delete(TrainTxtFile);
         }
 
         // Optional and experimental
@@ -174,7 +191,7 @@ namespace GrabDetectSort
         private static void LabelImages()
         {
             //darknet.exe detector test data/r5apex.data r5apex.cfg data\backup\r5apex_last.weights -dont_show -ext_output -save_labels < data/new_train.txt > result.txt
-            var arguments = $@"darknet detector test data\\{GameName}.data r5apex.cfg data\\backup\\r5apex_last.weights -thresh {DetectionThreshold} -dont_show -ext_output -save_labels < data\\train.txt > result.txt";
+            var arguments = $@"darknet detector test data\\{DetectorAlias}.data data\\{DetectorAlias}.cfg data\\{DetectorAlias}.weights -thresh {DetectionThreshold} -dont_show -ext_output -save_labels < data\\train.txt > result.txt";
             Console.WriteLine(arguments);
             var processStartInfo = new ProcessStartInfo("cmd.exe")
             {
@@ -201,7 +218,6 @@ namespace GrabDetectSort
             var files = new DirectoryInfo(directory).GetFiles($"{GameName}*.png");
             var pathOfImg = files.Aggregate("", (current, file) => current + $"data/{alias}/{file.Name}\r\n");
             File.WriteAllText(TrainTxtFile, pathOfImg);
-            File.WriteAllText(MainTxtFile, pathOfImg);
         }
 
         private static void GetFrames(string directory)
@@ -215,10 +231,13 @@ namespace GrabDetectSort
                 // 2 fps for main screen shot (middle of screen A0)
                 RunFfmpeg(file, "2", BlockSize, 752, 332, "A0", directory);
                 // and slightly less for secondary screens
-                RunFfmpeg(file, "1", BlockSize, 544, 124, "A1", TmpDirectory);
-                RunFfmpeg(file, "1", BlockSize, 960, 124, "A2", TmpDirectory);
-                RunFfmpeg(file, "1", BlockSize, 544, 540, "A3", TmpDirectory);
-                RunFfmpeg(file, "1", BlockSize, 960, 540, "A4", TmpDirectory);
+                if (CaptureMore)
+                {
+                    RunFfmpeg(file, "1", BlockSize, 544, 124, "A1", TmpDirectory);
+                    RunFfmpeg(file, "1", BlockSize, 960, 124, "A2", TmpDirectory);
+                    RunFfmpeg(file, "1", BlockSize, 544, 540, "A3", TmpDirectory);
+                    RunFfmpeg(file, "1", BlockSize, 960, 540, "A4", TmpDirectory);
+                }
             }
         }
 
